@@ -10,6 +10,8 @@ pinned: false
 
 # Personal News Aggregator, Weather Dashboard & Myanmar Market Tracker
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/lhk-dev/pulsemm)
+
 A zero-cost (`$0`), local personal news skimmer across **180 verified RSS feeds** (10 categories × 18 prestigious sources), coupled with a live **Yangon Open-Meteo Weather Widget** and **Yangon Street Market Currency (USD, EUR, SGD, THB → MMK) & Gold (16 Pae / 15 Pae per Tical)** exchange rate tracker with live calibration.
 
 ---
