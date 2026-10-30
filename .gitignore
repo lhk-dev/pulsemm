@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+news_aggregator.db
+news_aggregator.db-shm
+news_aggregator.db-wal
+.DS_Store
