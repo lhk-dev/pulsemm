@@ -1,6 +1,7 @@
 """Unit tests for the Personal News Aggregator, Weather & Myanmar Market Tracker."""
 
 from pathlib import Path
+import json
 
 import pytest
 
@@ -23,6 +24,7 @@ from app.database import (
 from app.feeds_config import FEEDS_CONFIG
 from app.fetcher import (
     _build_market_response,
+    _parse_street_mmk_html,
     extract_entry_raw_summary,
     is_article_relevant,
     parse_feed_xml,
@@ -353,10 +355,15 @@ def test_purge_old_articles_retention_and_saved_immunity(tmp_path: Path) -> None
     assert saved[0].id == art_old_saved.id
 
 
-def test_admin_pin_protection_for_calibration() -> None:
-    """Verify that market calibration requires the correct admin PIN."""
+def test_admin_pin_protection_for_calibration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify that market calibration requires the correct admin PIN and cleans up properly."""
     from starlette.testclient import TestClient
     from app.main import app
+    import app.database as db_mod
+
+    test_db = tmp_path / "test_api_cal.db"
+    db_mod.init_db(test_db)
+    monkeypatch.setattr(db_mod, "DEFAULT_DB_PATH", test_db)
 
     client = TestClient(app)
 
@@ -379,6 +386,51 @@ def test_admin_pin_protection_for_calibration() -> None:
     )
     assert res_good.status_code == 200
     assert res_good.json()["is_calibrated"] is True
+
+    # 4. Clean up / reset calibration
+    res_reset = client.delete("/api/market/calibrate?pin=$Billionaire3")
+    assert res_reset.status_code == 200
+    assert res_reset.json()["is_calibrated"] is False
+
+
+def test_parse_street_mmk_html_no_crossover() -> None:
+    """Verify that street MMK HTML parser correctly extracts SGD, USD, EUR, THB without crossover."""
+    sample_json = {
+        "data": {
+            "currencies": [
+                {
+                    "code": "USD",
+                    "sources": {"market": {"buy": "4860.00", "sell": "4811.40"}},
+                },
+                {
+                    "code": "SGD",
+                    "sources": {"market": {"buy": "3796.88", "sell": "3758.91"}},
+                },
+                {
+                    "code": "EUR",
+                    "sources": {"market": {"buy": "5400.00", "sell": "5346.00"}},
+                },
+                {
+                    "code": "THB",
+                    "sources": {"market": {"buy": "144.00", "sell": "142.56"}},
+                },
+            ]
+        }
+    }
+    sample_html = f'<html><body><div id="app" data-page=\'{json.dumps(sample_json)}\'></div></body></html>'
+    extracted = _parse_street_mmk_html(sample_html)
+
+    assert "USD" in extracted
+    assert "SGD" in extracted
+    assert "EUR" in extracted
+    assert "THB" in extracted
+
+    # Verify SGD does NOT equal USD
+    assert extracted["USD"] == (4811.40, 4860.00)
+    assert extracted["SGD"] == (3758.91, 3796.88)
+    assert extracted["EUR"] == (5346.00, 5400.00)
+    assert extracted["THB"] == (142.56, 144.00)
+
 
 
 

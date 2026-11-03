@@ -3,6 +3,7 @@
 import asyncio
 import calendar
 import html
+import json
 import re
 import time
 from datetime import datetime, timezone
@@ -41,6 +42,7 @@ OPEN_METEO_YANGON_URL = (
 )
 
 FOREX_API_URL = "https://open.er-api.com/v6/latest/USD"
+GOLD_API_URL = "https://api.gold-api.com/price/XAU"
 GOLD_PAXG_API_URL = "https://api.coinbase.com/v2/prices/PAXG-USD/spot"
 MYANMAR_STREET_FX_URL = "https://egcurrency.com/en/currency/mmk"
 
@@ -540,23 +542,55 @@ async def fetch_weather() -> WeatherResponse:
 
 def _parse_street_mmk_html(raw_html: str) -> dict[str, tuple[float, float]]:
     """Extract live Myanmar street market (buy, sell) rates from egcurrency MMK page."""
-    unescaped = html.unescape(raw_html)
     extracted: dict[str, tuple[float, float]] = {}
-    for code in ("USD", "EUR", "SGD", "THB"):
-        pattern = (
-            r'"code":"'
-            + code
-            + r'".*?"market":\{"id":\d+,"source":"market","buy":"([0-9.]+)","sell":"([0-9.]+)"'
-        )
-        match = re.search(pattern, unescaped)
-        if match:
-            try:
-                buy_val = float(match.group(1))
-                sell_val = float(match.group(2))
-                if buy_val > 0 and sell_val > 0:
-                    extracted[code] = (sell_val, buy_val)
-            except Exception:
-                continue
+    # 1. Primary method: structured data-page JSON embedded in HTML
+    try:
+        m = re.search(r'data-page=([\'"])(.*?)\1', raw_html, re.DOTALL)
+        if m:
+            page_data = json.loads(html.unescape(m.group(2)))
+            currencies = (
+                page_data.get("data", {}).get("currencies", [])
+                or page_data.get("props", {}).get("currencies", [])
+                or page_data.get("props", {}).get("data", {}).get("currencies", [])
+            )
+            for c in currencies:
+                code = str(c.get("code", "")).upper()
+                if code in ("USD", "EUR", "SGD", "THB"):
+                    market = c.get("sources", {}).get("market", {})
+                    if market:
+                        buy_val = float(market.get("buy", 0))
+                        sell_val = float(market.get("sell", 0))
+                        if buy_val > 0 and sell_val > 0:
+                            extracted[code] = (min(buy_val, sell_val), max(buy_val, sell_val))
+    except Exception:
+        pass
+
+    # 2. Resilient fallback regex if data-page structure changes (scoped strictly per currency block)
+    if not extracted:
+        unescaped = html.unescape(raw_html)
+        for code in ("USD", "EUR", "SGD", "THB"):
+            pattern = (
+                r'\{[^{}]*?"code"\s*:\s*"'
+                + code
+                + r'"[^{}]*?"market"\s*:\s*\{[^{}]*?"buy"\s*:\s*"([0-9.]+)"[^{}]*?"sell"\s*:\s*"([0-9.]+)"'
+            )
+            match = re.search(pattern, unescaped)
+            if not match:
+                pattern_rev = (
+                    r'\{[^{}]*?"code"\s*:\s*"'
+                    + code
+                    + r'"[^{}]*?"market"\s*:\s*\{[^{}]*?"sell"\s*:\s*"([0-9.]+)"[^{}]*?"buy"\s*:\s*"([0-9.]+)"'
+                )
+                match = re.search(pattern_rev, unescaped)
+            if match:
+                try:
+                    v1 = float(match.group(1))
+                    v2 = float(match.group(2))
+                    if v1 > 0 and v2 > 0:
+                        extracted[code] = (min(v1, v2), max(v1, v2))
+                except Exception:
+                    continue
+
     return extracted
 
 
@@ -577,14 +611,14 @@ def _build_market_response(
     sgd_per_usd = float(rates.get("SGD", 1.34)) or 1.34
     thb_per_usd = float(rates.get("THB", 33.8)) or 33.8
 
-    # Default Yangon open market USD/MMK (~4,680 Ks) or live scraped street rate
+    # Default Yangon open market USD/MMK (~4,835 Ks) or live scraped street rate
     street = street_rates or {}
     if "USD" in street:
         usd_buy, usd_sell = street["USD"]
         market_usd_mmk = round((usd_buy + usd_sell) / 2.0, 0)
     else:
-        market_usd_mmk = 4680.0
-        usd_buy, usd_sell = 4630.0, 4730.0
+        market_usd_mmk = 4835.0
+        usd_buy, usd_sell = 4810.0, 4860.0
 
     is_calibrated = False
     if calibration is not None and (
@@ -597,39 +631,39 @@ def _build_market_response(
         is_calibrated = True
         if calibration.usd_mmk:
             market_usd_mmk = round(calibration.usd_mmk, 0)
-            usd_buy = round(market_usd_mmk - 35, 0)
-            usd_sell = round(market_usd_mmk + 35, 0)
+            usd_buy = round(market_usd_mmk - 25, 0)
+            usd_sell = round(market_usd_mmk + 25, 0)
 
-    # Compute EUR, SGD, THB street rates from scraped data, cross-rates, or user calibration
+    # Compute EUR, SGD, THB street rates from live street data, calibration, or cross-rates
     if calibration and calibration.eur_mmk:
         eur_mid = round(calibration.eur_mmk, 0)
-        eur_buy, eur_sell = round(eur_mid - 45, 0), round(eur_mid + 45, 0)
-    elif "EUR" in street and not (calibration and calibration.usd_mmk):
+        eur_buy, eur_sell = round(eur_mid - 30, 0), round(eur_mid + 30, 0)
+    elif "EUR" in street:
         eur_buy, eur_sell = round(street["EUR"][0], 0), round(street["EUR"][1], 0)
         eur_mid = round((eur_buy + eur_sell) / 2.0, 0)
     else:
         eur_mid = round(market_usd_mmk / eur_per_usd, 0)
-        eur_buy, eur_sell = round(eur_mid - 45, 0), round(eur_mid + 45, 0)
+        eur_buy, eur_sell = round(eur_mid - 30, 0), round(eur_mid + 30, 0)
 
     if calibration and calibration.sgd_mmk:
         sgd_mid = round(calibration.sgd_mmk, 0)
-        sgd_buy, sgd_sell = round(sgd_mid - 30, 0), round(sgd_mid + 30, 0)
-    elif "SGD" in street and not (calibration and calibration.usd_mmk):
+        sgd_buy, sgd_sell = round(sgd_mid - 20, 0), round(sgd_mid + 20, 0)
+    elif "SGD" in street:
         sgd_buy, sgd_sell = round(street["SGD"][0], 0), round(street["SGD"][1], 0)
         sgd_mid = round((sgd_buy + sgd_sell) / 2.0, 0)
     else:
         sgd_mid = round(market_usd_mmk / sgd_per_usd, 0)
-        sgd_buy, sgd_sell = round(sgd_mid - 30, 0), round(sgd_mid + 30, 0)
+        sgd_buy, sgd_sell = round(sgd_mid - 20, 0), round(sgd_mid + 20, 0)
 
     if calibration and calibration.thb_mmk:
         thb_mid = round(calibration.thb_mmk, 1)
-        thb_buy, thb_sell = round(thb_mid - 1.5, 1), round(thb_mid + 1.5, 1)
-    elif "THB" in street and not (calibration and calibration.usd_mmk):
+        thb_buy, thb_sell = round(thb_mid - 1.0, 1), round(thb_mid + 1.0, 1)
+    elif "THB" in street:
         thb_buy, thb_sell = round(street["THB"][0], 1), round(street["THB"][1], 1)
         thb_mid = round((thb_buy + thb_sell) / 2.0, 1)
     else:
         thb_mid = round(market_usd_mmk / thb_per_usd, 1)
-        thb_buy, thb_sell = round(thb_mid - 1.5, 1), round(thb_mid + 1.5, 1)
+        thb_buy, thb_sell = round(thb_mid - 1.0, 1), round(thb_mid + 1.0, 1)
 
     currencies = [
         CurrencyRate(
@@ -673,10 +707,12 @@ def _build_market_response(
     if calibration and calibration.gold_16pae_mmk:
         market_16pae_mmk = int(calibration.gold_16pae_mmk)
     else:
-        market_16pae_mmk = int(round((gold_spot_usd / KYATTHA_PER_TROY_OZ) * market_usd_mmk, -4))
+        # Standard Shwe Bon Thar bullion rounding to nearest 5,000 Ks
+        raw_16pae = (gold_spot_usd / KYATTHA_PER_TROY_OZ) * market_usd_mmk
+        market_16pae_mmk = int(round(raw_16pae / 5000.0) * 5000)
 
     # 15 Pae Yway (93.75% jewelry gold) in Myanmar gold shops is (16_Pae / 16) * 15
-    market_15pae_mmk = int(round(market_16pae_mmk * (15.0 / 16.0), -3))
+    market_15pae_mmk = int(round((market_16pae_mmk * 15.0 / 16.0) / 5000.0) * 5000)
 
     gold = GoldRate(
         world_spot_usd_oz=round(gold_spot_usd, 2),
@@ -697,7 +733,7 @@ def _build_market_response(
 
 async def fetch_market_rates() -> MarketResponse:
     """Fetch live Yangon street market forex & gold rates with user calibration support."""
-    default_gold_usd = 4025.0
+    default_gold_usd = 3909.0
     calibration = await asyncio.to_thread(get_market_calibration)
     try:
         async with httpx.AsyncClient(
@@ -707,9 +743,10 @@ async def fetch_market_rates() -> MarketResponse:
         ) as client:
             forex_task = client.get(FOREX_API_URL)
             gold_task = client.get(GOLD_PAXG_API_URL)
+            gold_api_task = client.get(GOLD_API_URL)
             street_task = client.get(MYANMAR_STREET_FX_URL)
-            forex_resp, gold_resp, street_resp = await asyncio.gather(
-                forex_task, gold_task, street_task, return_exceptions=True
+            forex_resp, gold_resp, gold_api_resp, street_resp = await asyncio.gather(
+                forex_task, gold_task, gold_api_task, street_task, return_exceptions=True
             )
 
         if isinstance(forex_resp, BaseException):
@@ -721,13 +758,22 @@ async def fetch_market_rates() -> MarketResponse:
             raise RuntimeError("Empty forex rates payload")
 
         gold_spot_usd = default_gold_usd
-        if "XAU" in rates and float(rates["XAU"]) > 0:
-            gold_spot_usd = 1.0 / float(rates["XAU"])
-        elif not isinstance(gold_resp, BaseException) and gold_resp.status_code == 200:
-            gold_data = gold_resp.json().get("data", {})
-            amount_str = gold_data.get("amount")
-            if amount_str:
-                gold_spot_usd = float(amount_str)
+        if not isinstance(gold_api_resp, BaseException) and gold_api_resp.status_code == 200:
+            try:
+                g_price = float(gold_api_resp.json().get("price", 0))
+                if g_price > 1000:
+                    gold_spot_usd = g_price
+            except Exception:
+                pass
+
+        if gold_spot_usd == default_gold_usd:
+            if "XAU" in rates and float(rates["XAU"]) > 0:
+                gold_spot_usd = 1.0 / float(rates["XAU"])
+            elif not isinstance(gold_resp, BaseException) and gold_resp.status_code == 200:
+                gold_data = gold_resp.json().get("data", {})
+                amount_str = gold_data.get("amount")
+                if amount_str:
+                    gold_spot_usd = float(amount_str)
 
         street_rates: dict[str, tuple[float, float]] = {}
         if not isinstance(street_resp, BaseException) and street_resp.status_code == 200:
