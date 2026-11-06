@@ -10,10 +10,10 @@
   <link rel="manifest" href="/static/manifest.json" />
   <title>PulseMM — Forbes-Style Intelligence, Yangon Market &amp; Weather</title>
   
-  <!-- Forbes Typography: Merriweather (Authoritative Editorial Serif) + Plus Jakarta Sans + JetBrains Mono -->
+  <!-- Forbes & Myanmar Typography: Merriweather + Noto Sans Myanmar + Padauk + Plus Jakarta Sans + JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400&family=Noto+Sans+Myanmar:wght@400;500;600;700&family=Padauk:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -22,8 +22,8 @@
       theme: {
         extend: {
           fontFamily: {
-            serif: ['Merriweather', 'Georgia', 'serif'],
-            sans: ['"Plus Jakarta Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            serif: ['Merriweather', '"Noto Sans Myanmar"', 'Padauk', 'Pyidaungsu', 'Georgia', 'serif'],
+            sans: ['"Plus Jakarta Sans"', '"Noto Sans Myanmar"', 'Padauk', 'Pyidaungsu', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
             mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
           },
         },
@@ -33,6 +33,10 @@
   <style>
     body {
       background-color: #f8f9fa;
+      color: #1f2937;
+      -webkit-tap-highlight-color: transparent;
+      line-height: 1.6;
+    }
       color: #1f2937;
       -webkit-tap-highlight-color: transparent;
     }

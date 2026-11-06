@@ -58,8 +58,8 @@ SCRIPT_STYLE_RE = re.compile(
 )
 HTML_TAG_RE = re.compile(r"<[^>]+>")
 WHITESPACE_RE = re.compile(r"\s+")
-SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
-WORD_TOKEN_RE = re.compile(r"[a-z0-9]+")
+SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?။])\s*")
+WORD_TOKEN_RE = re.compile(r"\w+")
 
 # Global noise filter: block sports, football, NBA, entertainment gossip, and unrelated African/LatAm local news
 IRRELEVANT_NOISE_RE = re.compile(
@@ -93,6 +93,23 @@ MYANMAR_RELEVANCE_RE = re.compile(
     r"passport|passports|owic|conscription|moving abroad|offloaded|exodus|travel restrictions"
     r")\b",
     re.IGNORECASE,
+)
+
+# Myanmar Unicode script pattern (standard Myanmar block, Myanmar extended A & B)
+MYANMAR_BURMESE_UNICODE_RE = re.compile(r"[\u1000-\u109F\uAA60-\uAA7F\uA9E0-\uA9FE]")
+
+# Curated dedicated Myanmar independent publishers
+DEDICATED_MYANMAR_SOURCES = (
+    "frontier",
+    "myanmar now",
+    "irrawaddy",
+    "dvb",
+    "mizzima",
+    "bni",
+    "cj platform",
+    "rfa",
+    "bbc news မြန်မာ",
+    "bbc burmese",
 )
 
 # Weapons development, defense R&D, and using technology in the military
@@ -266,6 +283,11 @@ def is_article_relevant(category: str, title: str, brief: str, source_name: str)
 
     # 2. Myanmar categories: strictly Myanmar politics, business, economics, situation, and opportunities
     if category.startswith("Myanmar"):
+        src_lower = source_name.lower()
+        if any(d in src_lower for d in DEDICATED_MYANMAR_SOURCES):
+            return True
+        if MYANMAR_BURMESE_UNICODE_RE.search(combined):
+            return True
         return bool(MYANMAR_RELEVANCE_RE.search(combined))
 
     # 3. "Crisis & Geopolitics" tab: strictly critical wars, superpower flashpoints, sanctions & nuclear deterrence

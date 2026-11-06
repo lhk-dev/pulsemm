@@ -195,7 +195,7 @@ def test_relevance_filter_for_separated_myanmar_world_and_military_tabs() -> Non
         "BBC World",
     )
 
-    # 1. Myanmar categories: accepts NUG, passport restrictions, business, rejects non-Myanmar stories
+    # 1. Myanmar categories: accepts NUG, passport restrictions, business, Burmese script, rejects non-Myanmar stories
     assert is_article_relevant(
         "Myanmar: Politics & NUG",
         "NUG warns international community against normalizing military junta ties",
@@ -207,6 +207,25 @@ def test_relevance_filter_for_separated_myanmar_world_and_military_tabs() -> Non
         "Junta restricts passport renewals and offloads youths traveling abroad at Yangon airport",
         "Strict OWIC work permit and conscription requirements prevent citizens from moving abroad.",
         "Myanmar Now",
+    )
+    # Burmese Unicode articles from BBC Burmese, CJ Platform & RFA Burmese must be recognized
+    assert is_article_relevant(
+        "Myanmar: Current Situation & Daily Life",
+        "မန်းမှာ နေ့ခင်းကြောင်တောင် လက်ပစ်ဗုံး သေနတ်တွေကို အသုံးပြုပြီး ဓားပြတိုက်မှုကြောင့် ၃ ဦး သေနတ်ကျည်ထိမှန် သေဆုံး",
+        "မန္တလေးတိုင်း ပုသိမ်ကြီးမြို့နယ် ရန်ကင်းတောင်ခြေအဆင်းလမ်း ထာဝရဖုန်းဆိုင် ဓားပြတိုက်မှုဖြစ်ပွား။",
+        "CJ Platform (Citizen Journalism Myanmar)",
+    )
+    assert is_article_relevant(
+        "Myanmar: Politics & NUG",
+        "ဒေါ်အောင်ဆန်းစုကြည် သားဖြစ်သူနဲ့ဖုန်းပြောခဲ့တာကို‌လွှတ်တော်မှာထည့်ဆွေးနွေး",
+        "ဒေါ်အောင်ဆန်းစုကြည် သားဖြစ်သူနဲ့ဖုန်းပြောခဲ့တာကို‌ လွှတ်တော်မှာထည့်ဆွေးနွေးတဲ့သတင်းအပါအဝင် မြန်မာ့အရေးသတင်းများ။",
+        "BBC News မြန်မာ (BBC Burmese)",
+    )
+    assert is_article_relevant(
+        "Myanmar: Politics & NUG",
+        "ဦးမင်းအောင်လှိုင်အပါအဝင် ၁၀ ဦးကို တိုင်ကြားချက် ဖိလစ်ပိုင်အယူခံရုံး လက်ခံ",
+        "ဖိလစ်ပိုင် အယူခံတရားရုံးက မြန်မာစစ်ခေါင်းဆောင်တွေကို စစ်ရာဇဝတ်မှုနဲ့ စွဲချက်တင်ဖို့ ဆုံးဖြတ်။",
+        "RFA Burmese (Radio Free Asia မြန်မာဌာန)",
     )
     assert not is_article_relevant(
         "Myanmar: Politics & NUG",
