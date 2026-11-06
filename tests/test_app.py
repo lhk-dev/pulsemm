@@ -2,6 +2,8 @@
 
 from pathlib import Path
 import json
+import time
+from datetime import datetime, timezone
 
 import pytest
 
@@ -92,6 +94,9 @@ def test_sqlite_deduplication_and_permanent_dismiss(tmp_path: Path) -> None:
     id2 = compute_article_id(url_with_utm)
     assert id1 == id2
 
+    now_ts = int(time.time())
+    now_iso = datetime.now(timezone.utc).isoformat()
+
     art1 = ArticleCreate(
         id=id1,
         category="Myanmar & World",
@@ -99,8 +104,8 @@ def test_sqlite_deduplication_and_permanent_dismiss(tmp_path: Path) -> None:
         title="Test Story 1",
         url=url_clean,
         brief="Brief summary of story 1.",
-        published_at="2026-10-29T08:00:00+00:00",
-        published_ts=1793260800,
+        published_at=now_iso,
+        published_ts=now_ts - 3600,
     )
     art2 = ArticleCreate(
         id=compute_article_id("https://www.myanmar-now.org/en/news/story-456"),
@@ -109,8 +114,8 @@ def test_sqlite_deduplication_and_permanent_dismiss(tmp_path: Path) -> None:
         title="Test Story 2",
         url="https://www.myanmar-now.org/en/news/story-456",
         brief="Brief summary of story 2.",
-        published_at="2026-10-29T09:00:00+00:00",
-        published_ts=1793264400,
+        published_at=now_iso,
+        published_ts=now_ts - 1800,
     )
 
     inserted = upsert_articles([art1, art2], db_file)
@@ -256,6 +261,9 @@ def test_save_and_bookmark_read_later(tmp_path: Path) -> None:
     db_file = tmp_path / "test_saved.db"
     init_db(db_file)
 
+    now_ts = int(time.time())
+    now_iso = datetime.now(timezone.utc).isoformat()
+
     art = ArticleCreate(
         id=compute_article_id("https://example.com/defense-tech-drone"),
         category="Military, Weapons & Defense Tech",
@@ -263,8 +271,8 @@ def test_save_and_bookmark_read_later(tmp_path: Path) -> None:
         title="Next Gen Drone Swarm",
         url="https://example.com/defense-tech-drone",
         brief="Autonomous drone defense test.",
-        published_at="2026-10-30T00:00:00Z",
-        published_ts=1793318400,
+        published_at=now_iso,
+        published_ts=now_ts - 3600,
     )
     upsert_articles([art], db_file)
 
