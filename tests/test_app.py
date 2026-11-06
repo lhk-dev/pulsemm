@@ -34,9 +34,9 @@ from app.fetcher import (
 )
 
 
-def test_feeds_config_has_180_sources() -> None:
-    """Verify 10 categories with 18 prestigious sources each (180 feeds total)."""
-    assert len(FEEDS_CONFIG) == 10
+def test_feeds_config_has_252_sources() -> None:
+    """Verify 14 categories (3 Myanmar + 11 World) with 18 prestigious sources each (252 feeds total)."""
+    assert len(FEEDS_CONFIG) == 14
     total = 0
     for category, sources in FEEDS_CONFIG.items():
         assert len(sources) == 18, f"Category {category} does not have 18 sources"
@@ -44,7 +44,7 @@ def test_feeds_config_has_180_sources() -> None:
             assert src["name"].strip()
             assert src["url"].startswith("http")
             total += 1
-    assert total == 180
+    assert total == 252
 
 
 def test_sanitize_html_to_brief() -> None:
@@ -174,16 +174,16 @@ def test_parse_feed_xml_and_market_rates() -> None:
 
 
 def test_relevance_filter_for_separated_myanmar_world_and_military_tabs() -> None:
-    """Verify strict separation across Myanmar, World Crises & Geopolitics, and Military, Weapons & Defense Tech."""
+    """Verify strict separation across Myanmar, Crisis & Geopolitics, and Military, Weapons & Defense Tech."""
     # Sports & Ethiopia/Tigray noise must be blocked everywhere
     assert not is_article_relevant(
-        "Myanmar",
+        "Myanmar: Current Situation & Daily Life",
         "Ethiopia acquires Russian fighter jets and air defence systems amid war in Tigray",
         "The acquisition of the warplanes comes amid ongoing fighting in northern Tigray region.",
         "BBC World",
     )
     assert not is_article_relevant(
-        "World Crises & Geopolitics",
+        "Crisis & Geopolitics",
         "Ethiopia acquires Russian fighter jets and air defence systems amid war in Tigray",
         "The acquisition of the warplanes comes amid ongoing fighting in northern Tigray region.",
         "BBC World",
@@ -195,23 +195,29 @@ def test_relevance_filter_for_separated_myanmar_world_and_military_tabs() -> Non
         "BBC World",
     )
 
-    # 1. Myanmar tab: accepts Myanmar business/politics/opportunities, rejects non-Myanmar stories
+    # 1. Myanmar categories: accepts NUG, passport restrictions, business, rejects non-Myanmar stories
     assert is_article_relevant(
-        "Myanmar",
-        "Myanmar border trade and digital startup opportunities grow in Yangon",
-        "New scholarship and business opportunities for Myanmar youth amid kyat fluctuations.",
-        "Myanmar Business, Economy & Market",
+        "Myanmar: Politics & NUG",
+        "NUG warns international community against normalizing military junta ties",
+        "The National Unity Government and CRPH urged ASEAN to maintain stance against military council.",
+        "The Irrawaddy",
+    )
+    assert is_article_relevant(
+        "Myanmar: Current Situation & Daily Life",
+        "Junta restricts passport renewals and offloads youths traveling abroad at Yangon airport",
+        "Strict OWIC work permit and conscription requirements prevent citizens from moving abroad.",
+        "Myanmar Now",
     )
     assert not is_article_relevant(
-        "Myanmar",
+        "Myanmar: Politics & NUG",
         "Iran warns of retaliation after military airstrikes",
         "Tensions escalate across the Middle East.",
         "Iran War Watch",
     )
 
-    # 2. World Crises & Geopolitics tab: accepts Iran/Ukraine/Taiwan crises, rejects unrelated domestic stories
+    # 2. Crisis & Geopolitics tab: accepts Iran/Ukraine/Taiwan crises, rejects unrelated domestic stories
     assert is_article_relevant(
-        "World Crises & Geopolitics",
+        "Crisis & Geopolitics",
         "Iran warns of retaliation after Israeli airstrikes near Tehran",
         "Tensions escalate across the Strait of Hormuz as UN Security Council convenes.",
         "Iran, Israel & Middle East War Watch",
@@ -224,6 +230,75 @@ def test_relevance_filter_for_separated_myanmar_world_and_military_tabs() -> Non
         "New electronic warfare and laser weapon systems deployed on stealth fighter jets.",
         "The War Zone (TWZ)",
     )
+
+
+def test_section_filtering_myanmar_and_world(tmp_path: Path) -> None:
+    """Verify All Myanmar and All World section filtering in database queries."""
+    db_file = tmp_path / "test_sections.db"
+    init_db(db_file)
+
+    now_ts = int(time.time())
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    art_m1 = ArticleCreate(
+        id=compute_article_id("https://example.com/m1"),
+        category="Myanmar: Current Situation & Daily Life",
+        source="Myanmar Now",
+        title="Yangon youth passport and airport exit scrutiny",
+        url="https://example.com/m1",
+        brief="Brief about passports.",
+        published_at=now_iso,
+        published_ts=now_ts - 100,
+    )
+    art_m2 = ArticleCreate(
+        id=compute_article_id("https://example.com/m2"),
+        category="Myanmar: Politics & NUG",
+        source="The Irrawaddy",
+        title="NUG announces diplomatic initiative",
+        url="https://example.com/m2",
+        brief="Brief about NUG.",
+        published_at=now_iso,
+        published_ts=now_ts - 200,
+    )
+    art_w1 = ArticleCreate(
+        id=compute_article_id("https://example.com/w1"),
+        category="Space",
+        source="NASA",
+        title="Artemis lunar mission advances",
+        url="https://example.com/w1",
+        brief="Brief about Artemis.",
+        published_at=now_iso,
+        published_ts=now_ts - 300,
+    )
+    art_w2 = ArticleCreate(
+        id=compute_article_id("https://example.com/w2"),
+        category="Politics",
+        source="Politico",
+        title="Senate debates legislative package",
+        url="https://example.com/w2",
+        brief="Brief about Senate.",
+        published_at=now_iso,
+        published_ts=now_ts - 400,
+    )
+
+    upsert_articles([art_m1, art_m2, art_w1, art_w2], db_file)
+
+    # 1. All Myanmar returns only Myanmar categories
+    myanmar_articles = get_active_articles("All Myanmar", db_path=db_file)
+    assert len(myanmar_articles) == 2
+    assert {a.id for a in myanmar_articles} == {art_m1.id, art_m2.id}
+
+    # 2. All World returns only World categories
+    world_articles = get_active_articles("All World", db_path=db_file)
+    assert len(world_articles) == 2
+    assert {a.id for a in world_articles} == {art_w1.id, art_w2.id}
+
+    # 3. Unread counts contains roll-up section totals
+    counts = get_unread_counts(db_file)
+    assert counts["All Myanmar"] == 2
+    assert counts["All World"] == 2
+    assert counts["Myanmar: Current Situation & Daily Life"] == 1
+    assert counts["Space"] == 1
 
 
 def test_market_calibration_and_yangon_gold_formula(tmp_path: Path) -> None:

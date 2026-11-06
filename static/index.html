@@ -248,9 +248,42 @@
     </div>
   </header>
 
-  <!-- STICKY FORBES SECTION NAVIGATION: Clean white strip with crisp category tabs -->
-  <nav class="sticky top-0 z-20 border-b border-slate-200 dark:border-[#20242c] bg-white/95 dark:bg-[#161920]/95 backdrop-blur-md py-2">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+  <!-- STICKY SECTION NAVIGATION: Myanmar Section vs World Section Toggle + Category Tabs -->
+  <nav class="sticky top-0 z-20 border-b border-slate-200 dark:border-[#20242c] bg-white/95 dark:bg-[#161920]/95 backdrop-blur-md py-2.5">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-2">
+      <!-- Section Switcher Tabs -->
+      <div class="flex items-center justify-between gap-3">
+        <div class="inline-flex rounded-lg p-1 bg-slate-100 dark:bg-[#1a1d24] border border-slate-200 dark:border-[#2a2f3a] shadow-inner">
+          <button
+            id="section-myanmar-btn"
+            type="button"
+            class="section-btn inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-sans text-xs font-bold transition shadow-sm bg-rose-700 text-white"
+            title="Switch to Myanmar Section (Hotkey: 1)"
+          >
+            <span>🇲🇲</span>
+            <span>Myanmar Section</span>
+            <span id="section-myanmar-count" class="ml-1 text-[10px] font-mono opacity-80">(0)</span>
+          </button>
+          <button
+            id="section-world-btn"
+            type="button"
+            class="section-btn inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-sans text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
+            title="Switch to World Section (Hotkey: 2)"
+          >
+            <span>🌐</span>
+            <span>World Section</span>
+            <span id="section-world-count" class="ml-1 text-[10px] font-mono opacity-80">(0)</span>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="hidden md:inline-block font-sans text-[11px] text-slate-400 dark:text-slate-500">
+            Switch: <kbd class="px-1 py-0.5 rounded bg-slate-100 dark:bg-[#20242d] border border-slate-300 dark:border-[#383f4e] font-mono text-[10px]">1</kbd> Myanmar · <kbd class="px-1 py-0.5 rounded bg-slate-100 dark:bg-[#20242d] border border-slate-300 dark:border-[#383f4e] font-mono text-[10px]">2</kbd> World
+          </span>
+        </div>
+      </div>
+
+      <!-- Category Filter Tabs -->
       <div id="category-tabs" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar" aria-label="Category Tabs">
         <!-- Populated dynamically by app.js -->
       </div>

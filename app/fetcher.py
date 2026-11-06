@@ -81,15 +81,16 @@ IRRELEVANT_NOISE_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Myanmar keywords (strictly required for Myanmar & World)
+# Myanmar keywords (strictly required for Myanmar categories)
 MYANMAR_RELEVANCE_RE = re.compile(
     r"\b("
     r"myanmar|burma|burmese|yangon|rangoon|mandalay|naypyidaw|nay pyi taw|"
     r"rakhine|arakan|kachin|shan state|karen|kayin|kayah|karenni|chin state|"
     r"sagaing|magway|bago|tanintharyi|mon state|ayeyarwady|irrawaddy|mizzima|"
-    r"nug|sac|junta|tatmadaw|pdf|min aung hlaing|aung san suu kyi|"
-    r"tnla|mndaa|kia|knu|aa|arakan army|brotherhood alliance|eao|"
-    r"rohingya|kyat|myawaddy|muse|lashio|sittwe|kyaukphyu|dawei|thilawa"
+    r"nug|national unity government|crph|spring revolution|sac|junta|tatmadaw|pdf|"
+    r"min aung hlaing|aung san suu kyi|tnla|mndaa|kia|knu|aa|arakan army|brotherhood alliance|eao|"
+    r"rohingya|kyat|myawaddy|muse|lashio|sittwe|kyaukphyu|dawei|thilawa|"
+    r"passport|passports|owic|conscription|moving abroad|offloaded|exodus|travel restrictions"
     r")\b",
     re.IGNORECASE,
 )
@@ -263,12 +264,12 @@ def is_article_relevant(category: str, title: str, brief: str, source_name: str)
     if IRRELEVANT_NOISE_RE.search(combined):
         return False
 
-    # 2. "Myanmar" tab: strictly Myanmar politics, business, economics, situation, and opportunities
-    if category == "Myanmar":
+    # 2. Myanmar categories: strictly Myanmar politics, business, economics, situation, and opportunities
+    if category.startswith("Myanmar"):
         return bool(MYANMAR_RELEVANCE_RE.search(combined))
 
-    # 3. "World Crises & Geopolitics" tab: strictly critical wars, superpower flashpoints, sanctions & nuclear deterrence
-    if category == "World Crises & Geopolitics":
+    # 3. "Crisis & Geopolitics" tab: strictly critical wars, superpower flashpoints, sanctions & nuclear deterrence
+    if category in ("Crisis & Geopolitics", "World Crises & Geopolitics"):
         return bool(CRITICAL_WORLD_RE.search(combined))
 
     # 4. "Military, Weapons & Defense Tech" tab: strictly weapons R&D, military technology, drones, missiles & defense systems

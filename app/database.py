@@ -254,6 +254,30 @@ def get_active_articles(
                 """,
                 (limit,),
             ).fetchall()
+        elif category == "All Myanmar":
+            rows = conn.execute(
+                """
+                SELECT id, category, source, title, url, brief,
+                       published_at, published_ts, dismissed, saved
+                FROM articles
+                WHERE dismissed = 0 AND published_ts >= ? AND category LIKE 'Myanmar%'
+                ORDER BY published_ts DESC
+                LIMIT ?;
+                """,
+                (cutoff_ts, limit),
+            ).fetchall()
+        elif category == "All World":
+            rows = conn.execute(
+                """
+                SELECT id, category, source, title, url, brief,
+                       published_at, published_ts, dismissed, saved
+                FROM articles
+                WHERE dismissed = 0 AND published_ts >= ? AND category NOT LIKE 'Myanmar%'
+                ORDER BY published_ts DESC
+                LIMIT ?;
+                """,
+                (cutoff_ts, limit),
+            ).fetchall()
         elif category and category != "All":
             rows = conn.execute(
                 """
@@ -297,7 +321,7 @@ def get_active_articles(
 
 
 def get_unread_counts(db_path: Path | None = None) -> dict[str, int]:
-    """Return unread counts for the last 7 days grouped by category plus total saved count."""
+    """Return unread counts for the last 7 days grouped by category plus section & saved totals."""
     now_ts = int(datetime.now(timezone.utc).timestamp())
     cutoff_ts = now_ts - (7 * 86400)
 
@@ -320,6 +344,11 @@ def get_unread_counts(db_path: Path | None = None) -> dict[str, int]:
             """
         ).fetchone()
         counts["Saved"] = int(saved_row["cnt"]) if saved_row else 0
+
+        # Compute Section roll-up counts
+        counts["All Myanmar"] = sum(v for k, v in counts.items() if k.startswith("Myanmar") and k != "Saved")
+        counts["All World"] = sum(v for k, v in counts.items() if not k.startswith("Myanmar") and k not in ("Saved", "All Myanmar"))
+
         return counts
 
 
@@ -365,6 +394,22 @@ def dismiss_category_articles(
                 UPDATE articles
                 SET dismissed = 1
                 WHERE dismissed = 0;
+                """
+            )
+        elif category == "All Myanmar":
+            cursor = conn.execute(
+                """
+                UPDATE articles
+                SET dismissed = 1
+                WHERE dismissed = 0 AND category LIKE 'Myanmar%';
+                """
+            )
+        elif category == "All World":
+            cursor = conn.execute(
+                """
+                UPDATE articles
+                SET dismissed = 1
+                WHERE dismissed = 0 AND category NOT LIKE 'Myanmar%';
                 """
             )
         else:

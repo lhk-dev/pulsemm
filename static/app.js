@@ -25,35 +25,84 @@
  * @property {number} total_unread
  */
 
-const CATEGORY_ORDER = [
-  "Myanmar",
-  "World Crises & Geopolitics",
-  "Military, Weapons & Defense Tech",
-  "Technology & Computer Science",
-  "AI",
-  "Business & Economy",
-  "Science",
-  "Health & Wellness",
-  "Environment",
-  "Opinion, Editorial & Feature Stories",
-];
+const SECTIONS = {
+  myanmar: {
+    id: "myanmar",
+    name: "Myanmar Section",
+    allCategory: "All Myanmar",
+    categories: [
+      "Myanmar: Current Situation & Daily Life",
+      "Myanmar: Politics & NUG",
+      "Myanmar: Business & Economics",
+    ],
+    labels: {
+      "All Myanmar": "All Myanmar",
+      "Myanmar: Current Situation & Daily Life": "Daily Life & Passports",
+      "Myanmar: Politics & NUG": "Politics & NUG",
+      "Myanmar: Business & Economics": "Business & Economics",
+    },
+  },
+  world: {
+    id: "world",
+    name: "World Section",
+    allCategory: "All World",
+    categories: [
+      "Politics",
+      "Crisis & Geopolitics",
+      "Military, Weapons & Defense Tech",
+      "Technology & Computer Science",
+      "AI",
+      "Business & Economics",
+      "Science",
+      "Space",
+      "Health & Wellness",
+      "Environment",
+      "Opinion, Editorial & Feature Stories",
+    ],
+    labels: {
+      "All World": "All World",
+      "Politics": "Politics",
+      "Crisis & Geopolitics": "Crisis & Geopolitics",
+      "Military, Weapons & Defense Tech": "Military & Defense",
+      "Technology & Computer Science": "Tech & Computing",
+      "AI": "AI",
+      "Business & Economics": "Business & Economics",
+      "Science": "Science",
+      "Space": "Space",
+      "Health & Wellness": "Health & Wellness",
+      "Environment": "Environment",
+      "Opinion, Editorial & Feature Stories": "Opinion & Features",
+    },
+  },
+};
 
 /** @type {Record<string, string>} */
 const CATEGORY_DOT_COLORS = {
+  "Myanmar: Current Situation & Daily Life": "bg-rose-500",
+  "Myanmar: Politics & NUG": "bg-red-600",
+  "Myanmar: Business & Economics": "bg-emerald-500",
   "Myanmar": "bg-rose-500",
+  "Politics": "bg-blue-500",
+  "Crisis & Geopolitics": "bg-amber-400",
   "World Crises & Geopolitics": "bg-amber-400",
   "Military, Weapons & Defense Tech": "bg-orange-500",
   "Technology & Computer Science": "bg-sky-400",
   "AI": "bg-violet-400",
+  "Business & Economics": "bg-emerald-400",
   "Business & Economy": "bg-emerald-400",
   "Science": "bg-cyan-400",
+  "Space": "bg-indigo-400",
   "Health & Wellness": "bg-teal-400",
   "Environment": "bg-lime-400",
   "Opinion, Editorial & Feature Stories": "bg-fuchsia-400",
 };
 
+const savedSection = localStorage.getItem("pulsemm_section") === "world" ? "world" : "myanmar";
+const defaultCategory = savedSection === "world" ? "All World" : "All Myanmar";
+
 const state = {
-  activeCategory: "All",
+  activeSection: savedSection,
+  activeCategory: localStorage.getItem("pulsemm_category") || defaultCategory,
   /** @type {Article[]} */
   articles: [],
   /** @type {Record<string, number>} */
@@ -237,18 +286,70 @@ async function loadMarketRates() {
 }
 
 /**
+ * Render the Myanmar Section vs World Section switch buttons.
+ */
+function renderSectionSwitch() {
+  const myanmarBtn = document.getElementById("section-myanmar-btn");
+  const worldBtn = document.getElementById("section-world-btn");
+  const myanmarCount = document.getElementById("section-myanmar-count");
+  const worldCount = document.getElementById("section-world-count");
+
+  const mCountVal = state.counts["All Myanmar"] || 0;
+  const wCountVal = state.counts["All World"] || 0;
+
+  if (myanmarCount) myanmarCount.textContent = `(${mCountVal})`;
+  if (worldCount) worldCount.textContent = `(${wCountVal})`;
+
+  if (myanmarBtn && worldBtn) {
+    if (state.activeSection === "myanmar") {
+      myanmarBtn.className =
+        "section-btn inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-sans text-xs font-bold transition shadow-sm bg-rose-700 text-white";
+      worldBtn.className =
+        "section-btn inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-sans text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition";
+    } else {
+      myanmarBtn.className =
+        "section-btn inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-sans text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition";
+      worldBtn.className =
+        "section-btn inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 font-sans text-xs font-bold transition shadow-sm bg-slate-900 dark:bg-white text-white dark:text-slate-900";
+    }
+  }
+}
+
+/**
+ * Switch active section between "myanmar" and "world".
+ * @param {"myanmar" | "world"} sectionId
+ */
+function switchSection(sectionId) {
+  state.activeSection = sectionId;
+  const sectionConfig = SECTIONS[sectionId] || SECTIONS.myanmar;
+  state.activeCategory = sectionConfig.allCategory;
+  try {
+    localStorage.setItem("pulsemm_section", sectionId);
+    localStorage.setItem("pulsemm_category", state.activeCategory);
+  } catch {}
+  renderSectionSwitch();
+  renderCategoryTabs();
+  updateDismissCategoryButtonLabel();
+  loadArticles();
+}
+
+/**
  * Render category filter tabs with unread count badges.
  */
 function renderCategoryTabs() {
   const container = document.getElementById("category-tabs");
   if (!container) return;
 
+  const currentSection = SECTIONS[state.activeSection] || SECTIONS.myanmar;
+  const allCategoryName = currentSection.allCategory;
+  const allCategoryCount = state.counts[allCategoryName] || 0;
+
   const tabs = [
-    { name: "All", label: "All", count: state.totalUnread },
+    { name: allCategoryName, label: currentSection.name === "Myanmar Section" ? "All Myanmar" : "All World", count: allCategoryCount },
     { name: "Saved", label: "★ Saved", count: state.counts["Saved"] || 0 },
-    ...CATEGORY_ORDER.map((cat) => ({
+    ...currentSection.categories.map((cat) => ({
       name: cat,
-      label: cat,
+      label: currentSection.labels[cat] || cat,
       count: state.counts[cat] || 0,
     })),
   ];
@@ -263,6 +364,9 @@ function renderCategoryTabs() {
         if (tab.name === "Saved") {
           btnClasses = "bg-amber-600 dark:bg-amber-400 text-white dark:text-slate-950 border-amber-600 dark:border-amber-400 font-bold shadow-sm";
           badgeClasses = "text-white/80 dark:text-black/80 font-mono font-bold";
+        } else if (state.activeSection === "myanmar") {
+          btnClasses = "bg-rose-700 dark:bg-rose-600 text-white border-rose-700 dark:border-rose-600 font-bold shadow-sm";
+          badgeClasses = "text-white/80 font-mono font-bold";
         } else {
           btnClasses = "bg-slate-900 dark:bg-white text-white dark:text-slate-950 border-slate-900 dark:border-white font-bold shadow-sm";
           badgeClasses = "text-white/80 dark:text-black/80 font-mono font-bold";
@@ -289,8 +393,11 @@ function renderCategoryTabs() {
 
   container.querySelectorAll(".category-tab").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const selected = btn.getAttribute("data-category") || "All";
+      const selected = btn.getAttribute("data-category") || currentSection.allCategory;
       state.activeCategory = selected;
+      try {
+        localStorage.setItem("pulsemm_category", selected);
+      } catch {}
       updateDismissCategoryButtonLabel();
       renderCategoryTabs();
       loadArticles();
@@ -310,10 +417,12 @@ function updateDismissCategoryButtonLabel() {
     btn.classList.add("hidden");
   } else {
     btn.classList.remove("hidden");
-    if (state.activeCategory === "All") {
-      labelEl.textContent = "Dismiss All Visible";
+    if (state.activeCategory === "All" || state.activeCategory === "All Myanmar" || state.activeCategory === "All World") {
+      labelEl.textContent = `Dismiss ${state.activeCategory === "All Myanmar" ? "All Myanmar" : state.activeCategory === "All World" ? "All World" : "All Visible"}`;
     } else {
-      labelEl.textContent = `Dismiss All in ${state.activeCategory}`;
+      const currentSection = SECTIONS[state.activeSection] || SECTIONS.myanmar;
+      const shortLabel = currentSection.labels[state.activeCategory] || state.activeCategory;
+      labelEl.textContent = `Dismiss All in ${shortLabel}`;
     }
   }
 }
@@ -561,6 +670,7 @@ async function loadArticles() {
     state.counts["Saved"] = localSaved.size;
     state.totalUnread = Math.max(0, (data.total_unread || 0) - localDismissed.size);
 
+    renderSectionSwitch();
     renderCategoryTabs();
     renderArticles();
     return data;
@@ -829,11 +939,28 @@ function setupKeyboardShortcuts() {
     } else if (key === "r") {
       event.preventDefault();
       triggerRefreshFeeds();
+    } else if (key === "1") {
+      event.preventDefault();
+      switchSection("myanmar");
+    } else if (key === "2") {
+      event.preventDefault();
+      switchSection("world");
     }
   });
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  const myanmarBtn = document.getElementById("section-myanmar-btn");
+  if (myanmarBtn) {
+    myanmarBtn.addEventListener("click", () => switchSection("myanmar"));
+  }
+
+  const worldBtn = document.getElementById("section-world-btn");
+  if (worldBtn) {
+    worldBtn.addEventListener("click", () => switchSection("world"));
+  }
+
+  renderSectionSwitch();
   // Forbes Theme Toggle (Default Light Paper / Soft Charcoal Dark)
   const themeBtn = document.getElementById("toggle-theme-btn");
   const themeIcon = document.getElementById("theme-icon");
